@@ -1,0 +1,54 @@
+:root {
+  --primary-colour: #5C6F84;
+  --secondary-colour: #B0896A;
+  --tertiary-colour: #EDB0A1;
+  --fourth-colour: #D7999B;
+  --fifth-colour: #868978;
+}
+#header {
+  text-align: center;
+  color: var(--primary-colour);
+  background-color: var(--tertiary-colour);
+}
+img {
+  object-fit: fill;
+}
+table, th, td {
+  border: 1px solid black;
+  align: center;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+th, td {
+  width: 30vw
+}
+nav a {
+  color: var(--primary-colour);
+}
+nav a:hover {
+  color: var(--secondary-colour);
+}
+.button-primary {
+  background-color: var(--secondary-colour);
+  color: white;
+}
+.button-secondary {
+  background-color: var(--fourth-colour);
+  color: white;
+}
+body {
+  background-color: #f5f5f5;
+  color: var(--primary-colour);
+}
+.section-alt {
+  background-color: var(--tertiary-colour);
+}
+.card {
+  background-color: white;
+  border-left: 4px solid var(--secondary-colour);
+}
+footer {
+  background-color: var(--fifth-colour);
+  color: white;
+}

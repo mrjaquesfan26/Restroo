@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+{% block body %}
+<script>
+navigator.geolocation.getCurrentPosition(position => {
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
+
+    fetch('/api/get_map_url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: lat, lon: lon })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('result').innerHTML = `
+            <img src="${data.map_url}" alt="Location map">
+        `;
+    });
+});
+</script>
+<div id="result"></div>
+{% endblock %}

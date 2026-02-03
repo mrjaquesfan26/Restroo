@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block body %}
+<div id="header">
+    <h1>Restroo</h1>
+</div>
+<div id="content">
+    <table id="restrooms-table">
+        {%for i in range(0,10)%}
+        <tr><th>TITLE</th></tr>
+        <tr>
+            <th style="width:200px"><img src="https://www.startpage.com/av/proxy-image?piurl=https%3A%2F%2Fmedia.istockphoto.com%2Fid%2F1316134499%2Fphoto%2Fa-concept-image-of-a-magnifying-glass-on-blue-background-with-a-word-example-zoom-inside-the.jpg%3Fs%3D612x612%26w%3D0%26k%3D20%26c%3DsZM5HlZvHFYnzjrhaStRpex43URlxg6wwJXff3BE9VA%3D&sp=1770259050T18c1fc6b36032fc22790129e4efe705d27c2774fa21afb8b94cda3fe05a2dc87" style="width: 200px"></img></th>
+            <th>Verifications And Features</th>
+            <th>address and verify/deny</th>
+        </tr>
+        {%endfor%}
+    </table>
+</div>
+<div id="footer">
+</div>
+{% endblock %}
