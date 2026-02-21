@@ -1,22 +1,128 @@
 {% extends "layout.html" %}
 {% block body %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<div class="row justify-content-center">
+  <div class="col-lg-10">
+    <div class="card shadow">
+      <div class="card-header text-white" style="background-color: var(--primary-colour);">
+        <h2 class="mb-0"><i class="bi bi-plus-circle"></i> Add New Restroom</h2>
+      </div>
+      <div class="card-body p-4">
+        <div class="mb-4">
+          <h5 class="mb-3"><i class="bi bi-geo-alt"></i> Location</h5>
+          <div class="row g-3 mb-3">
+            <div class="col-md-12">
+              <label for="address" class="form-label">Address</label>
+              <input type="text" class="form-control" id="address" placeholder="Search for an address">
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-5">
+              <label for="lat" class="form-label">Latitude</label>
+              <input type="text" class="form-control" id="lat" placeholder="Enter latitude">
+            </div>
+            <div class="col-md-5">
+              <label for="lon" class="form-label">Longitude</label>
+              <input type="text" class="form-control" id="lon" placeholder="Enter longitude">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button type="button" class="btn btn-outline-primary w-100" id="getLocationBtn">
+                <i class="bi bi-crosshair"></i> My Location
+              </button>
+            </div>
+          </div>
+          <div class="border rounded overflow-hidden" style="height: 450px; background-color: #e0e0e0;">
+            <div id="map" style="height: 100%; width: 100%;"></div>
+          </div>
+          <div id="error" class="alert alert-danger mt-2" style="display: none;"></div>
+        </div>
+        <hr>
+        <div class="mb-4">
+          <h5 class="mb-3"><i class="bi bi-list-check"></i> Features</h5>
+          <div id="features">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="babychange">
+              <label class="form-check-label" for="babychange">Baby Change</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="sharps">
+              <label class="form-check-label" for="sharps">Sharps Disposal</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="handicapped">
+              <label class="form-check-label" for="handicapped">Handicapped Accessible</label>
+            </div>
+          </div>
+        </div>
+        <hr>
+        <div class="mb-4">
+          <fieldset class="star-rating">
+            <legend class="mb-3"><i class="bi bi-star"></i> Cleanliness Rating</legend>
+            <div>
+              <input type="radio" name="rating" value="1" id="rating1" />
+              <label for="rating1"><span>1</span></label>
+              <input type="radio" name="rating" value="2" id="rating2" />
+              <label for="rating2"><span>2</span></label>
+              <input type="radio" name="rating" value="3" id="rating3" />
+              <label for="rating3"><span>3</span></label>
+              <input type="radio" name="rating" value="4" id="rating4" />
+              <label for="rating4"><span>4</span></label>
+              <input type="radio" name="rating" value="5" id="rating5" />
+              <label for="rating5"><span>5</span></label>
+            </div>
+          </fieldset>
+        </div>
+        <hr>
+        <div class="mb-4">
+          <div class="g-recaptcha" data-sitekey="6Lc74mksAAAAADpDeQndK344kWqk3pURzX4SM_Dq" data-callback="onCaptchaSuccess"></div>
+        </div>
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+          <a href="/" class="btn btn-secondary btn-lg"><i class="bi bi-x-circle"></i> Cancel</a>
+          <button type="button" class="btn btn-lg" style="background-color: var(--secondary-colour); color: white;" id="submitBtn" disabled>
+            <i class="bi bi-check-circle"></i> Add Bathroom
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='add-toilet.js') }}"></script>
 <script>
-navigator.geolocation.getCurrentPosition(position => {
-    const lat = position.coords.latitude;
-    const lon = position.coords.longitude;
-
-    fetch('/api/get_map_url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: lat, lon: lon })
-    })
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('result').innerHTML = `
-            <img src="${data.map_url}" alt="Location map">
-        `;
+var rating = 0;
+function onCaptchaSuccess(token) {
+    document.getElementById('submitBtn').disabled = false;
+}
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.star-rating input[name="rating"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            rating = document.querySelector('.star-rating input[name="rating"]:checked').value;
+        });
+    });
+    document.getElementById('submitBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        const address = document.getElementById('address').value;
+        const lat = document.getElementById('lat').value;
+        const lon = document.getElementById('lon').value;
+        const features = [];
+        document.querySelectorAll('#features input[type="checkbox"]:checked').forEach(checkbox => {
+            features.push(checkbox.id);
+        });
+        const recaptchaResponse = grecaptcha.getResponse();
+        if (!lat || !lon) { alert('Please select a location on the map'); return; }
+        if (rating === 0) { alert('Please select a cleanliness rating'); return; }
+        if (!recaptchaResponse) { alert('Please complete the reCAPTCHA'); return; }
+        fetch('/api/add_toilet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address, lat, lon, features, cleanliness: parseInt(rating), 'g-recaptcha-response': recaptchaResponse })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) { alert('Bathroom added successfully!'); window.location.href = '/'; }
+            else { alert('Error: ' + data.error); }
+        })
+        .catch(error => { alert('Error submitting bathroom: ' + error); });
     });
 });
 </script>
-<div id="result"></div>
 {% endblock %}

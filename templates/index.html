@@ -1,18 +1,84 @@
 {% extends "layout.html" %}
 {% block body %}
-<div id="header">
-    <h1>Restroo</h1>
+<div class="text-center mb-4" style="background-color: var(--tertiary-colour); padding: 2rem; border-radius: 0.5rem;">
+  <h1 class="display-4 fw-bold" style="color: var(--primary-colour);">
+    <i class="bi bi-geo-alt-fill"></i> Restroo
+  </h1>
+  <p class="lead">Find the best restrooms near you</p>
+  <a href="/get-toilet" class="btn btn-lg mt-3" style="background-color: var(--secondary-colour); color: white;">
+    <i class="bi bi-plus-circle"></i> Add a Restroom
+  </a>
 </div>
+
 <div id="content">
-    <table id="restrooms-table">
-        {%for i in range(0,10)%}
-        <tr><th>TITLE</th></tr>
-        <tr>
-            <th style="width:200px"><img src="https://www.startpage.com/av/proxy-image?piurl=https%3A%2F%2Fmedia.istockphoto.com%2Fid%2F1316134499%2Fphoto%2Fa-concept-image-of-a-magnifying-glass-on-blue-background-with-a-word-example-zoom-inside-the.jpg%3Fs%3D612x612%26w%3D0%26k%3D20%26c%3DsZM5HlZvHFYnzjrhaStRpex43URlxg6wwJXff3BE9VA%3D&sp=1770259050T18c1fc6b36032fc22790129e4efe705d27c2774fa21afb8b94cda3fe05a2dc87" style="width: 200px"></img></th>
-            <th>Verifications And Features</th>
-            <th>address and verify/deny</th>
-        </tr>
-        {%endfor%}
-    </table>
+  <h2 class="mb-4"><i class="bi bi-list"></i> Available Restrooms</h2>
+  {% if bathrooms %}
+    <div class="row g-4">
+      {% for bathroom in bathrooms %}
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm">
+          <a href="{% if bathroom[4] %}https://www.google.com/maps/search/?api=1&query={{ bathroom[4]|urlencode }}{% else %}https://www.google.com/maps/@{{ bathroom[1].replace(' ', '') }},15z{% endif %}" target="_blank">
+            <img src="/api/map_image?coords={{ bathroom[1] }}" class="card-img-top" alt="Map" style="height: 200px; object-fit: cover;">
+          </a>
+          <div class="card-body">
+            <h5 class="card-title">
+              {% if bathroom[4] %}
+                {{ bathroom[4].split(",")[0] }}
+              {% else %}
+                Restroom #{{ bathroom[0] }}
+              {% endif %}
+            </h5>
+            <p class="mb-2">
+              {% if bathroom[6] %}
+                <i class="bi bi-person"></i> {{ getUsername(bathroom[6]) }}
+              {% endif %}
+            </p>
+            <p class="text-muted mb-2">
+              <i class="bi bi-geo-alt"></i>
+              {% if bathroom[4] %}
+                {{ bathroom[4] }}
+              {% else %}
+                {{ bathroom[1] }}
+              {% endif %}
+            </p>
+            <div class="mb-2">
+              <strong>Cleanliness:</strong>
+              {% for i in range(bathroom[3]) %}
+                <i class="bi bi-star-fill" style="color: gold;"></i>
+              {% endfor %}
+              {% for i in range(5 - bathroom[3]) %}
+                <i class="bi bi-star" style="color: gold;"></i>
+              {% endfor %}
+            </div>
+            {% if bathroom[2] %}
+            <div class="mb-2">
+              <strong>Features:</strong><br>
+              {% for feature in bathroom[2].split(',') %}
+                {% if feature %}
+                  <span class="badge bg-info me-1 mb-1">{{ feature }}</span>
+                {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+            <div>
+              <span class="badge" style="background-color: var(--secondary-colour);">
+                <i class="bi bi-hand-thumbs-up"></i> {{ bathroom[5] }} Endorsements
+              </span>
+            </div>
+          </div>
+          <div class="card-footer bg-transparent">
+            <a href="{% if bathroom[4] %}https://www.google.com/maps/search/?api=1&query={{ bathroom[4]|urlencode }}{% else %}https://www.google.com/maps/@{{ bathroom[1].replace(' ', '') }},15z{% endif %}" class="btn btn-sm btn-outline-primary w-100" target="_blank">
+              <i class="bi bi-map"></i> View on Map
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-info" role="alert">
+      <i class="bi bi-info-circle"></i> No restrooms added yet. Be the first to add one!
+    </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,6 +1,7 @@
 import sqlite3
 import requests
 import secrets
+import re
 from flask import Flask, render_template, request, redirect, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -19,13 +20,6 @@ def openDB():
 def closeDB(conn):
     conn.commit()
     conn.close()
-
-
-def getCoords():
-    data = requests.get_json()
-    lat = data.get('latitude')
-    lon = data.get('longitude')
-    return (lat, lon)
 
 
 def clean_sessions():
@@ -102,7 +96,8 @@ def initDB():
                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                    username TEXT UNIQUE NOT NULL,
                    password TEXT NOT NULL,
-                   trust_rating FLOAT NOT NULL DEFAULT 0
+                   trust_rating FLOAT NOT NULL DEFAULT 0,
+                   isAdmin BOOL NOT NULL DEFAULT False
                    )''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS sessions (
                     token TEXT PRIMARY KEY,
@@ -113,6 +108,9 @@ def initDB():
     cursor.execute('''CREATE TABLE IF NOT EXISTS bathrooms(
                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                    coords TEXT NOT NULL,
+                   features TEXT,
+                   cleanliness INTEGER NOT NULL,
+                   address TEXT,
                    verifications INTEGER NOT NULL DEFAULT 0,
                    user_id INTEGER NOT NULL,
                    FOREIGN KEY (user_id) REFERENCES users(id)
@@ -126,10 +124,20 @@ def get_map_url(lat, lon, zoom=15, size="600x400"):
     return map_url
 
 
+def getBathrooms():
+    conn, cursor = openDB()
+    cursor.execute("SELECT * FROM bathrooms")
+    bathrooms = cursor.fetchall()
+    closeDB(conn)
+    return bathrooms
+
+
 def getUsers():
     conn, cursor = openDB()
     cursor.execute("SELECT * FROM users")
-    return cursor.fetchall()
+    users = cursor.fetchall()
+    closeDB(conn)
+    return users
 
 
 @app.route("/login", methods=["POST", "GET"])
@@ -140,6 +148,21 @@ def login():
 @app.route('/sign-up')
 def signUp():
     return render_template("sign-up.html")
+
+
+@app.route("/get-toilet")
+def get_toilet():
+    if authenticate():
+        return render_template("add-toilet.html")
+    else:
+        return redirect("/login")
+
+
+@app.route('/api/get_maps_api_key')
+def get_maps_api_key():
+    if not authenticate():
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify({"api_key": API_KEY})
 
 
 @app.route("/api/sign-in", methods=["POST"])
@@ -165,11 +188,20 @@ def signIn():
 
 @app.route("/add_user", methods=["POST"])
 def addUser():
+    special = "!@#$%^&*()-+?+,"
     username = request.form.get("username")
     password = request.form.get("password")  # never sanitize passwords
 
     if not username or not password:
         flash("Username and password required", "error")
+        return redirect("/sign-up")
+
+    if not re.match(r'^[a-zA-Z0-9_]+$', username):
+        flash("Username can only contain letters, numbers, and underscores", "error")
+        return redirect("/sign-up")
+
+    if len(password) < 8 or not any(c.isdigit() for c in password) or not any(c in special for c in password):
+        flash("Password must be 8+ characters and contain a number and special character", "error")
         return redirect("/sign-up")
 
     conn, cursor = openDB()
@@ -201,20 +233,83 @@ def logout():
     return response
 
 
+@app.route('/api/add_toilet', methods=['POST'])
+def addToilet():
+    user_id = authenticate()
+    if not user_id:
+        return jsonify({"success": False, "error": "Not logged in"}), 401
+    try:
+        data = request.get_json()
+
+        address = data.get('address')
+        lat = data.get('lat')
+        lon = data.get('lon')
+        features = data.get('features', [])
+        coords = f"{lat},{lon}"
+
+        try:
+            cleanliness = int(data.get('cleanliness'))
+            if not (1 <= cleanliness <= 5):
+                return jsonify({"success": False, "error": "Cleanliness must be between 1 and 5"}), 400
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "Invalid cleanliness value"}), 400
+
+        if not (-43.50 <= float(lat) <= -10.5):
+            return jsonify({"success": False, "error": "Restroo is an Australia only service"}), 400
+        if not (113.3 <= float(lon) <= 153.7):
+            return jsonify({"success": False, "error": "Restroo is an Australia only service"}), 400
+
+        valid_features = {"Accessible", "Baby Changing", "Free", "Soap", "Hand Dryer"}
+        features = [f for f in features if f in valid_features]
+        features_str = ','.join(features)
+
+        conn, cursor = openDB()
+        cursor.execute(
+            "INSERT INTO bathrooms (address, coords, features, cleanliness, user_id) VALUES (?, ?, ?, ?, ?)",
+            (address, coords, features_str, cleanliness, user_id)
+        )
+        closeDB(conn)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+@app.route('/api/map_image')
+def map_image():
+    coords = request.args.get('coords')
+    if not coords:
+        return "No coords provided", 400
+    url = f"https://maps.googleapis.com/maps/api/staticmap?center={coords}&zoom=15&size=400x300&markers=color:red%7C{coords}&key={API_KEY}"
+    response = requests.get(url)
+    return response.content, 200, {'Content-Type': 'image/png'}
+
+
 @app.route("/")
 def index():
     if authenticate():
         session["username"] = usernameFromSession()
-    return render_template("index.html")
+    toilets = getBathrooms()
+    return render_template("index.html", bathrooms=toilets, getUsername=getUsername)
 
 
-@app.route("/get-toilet")
-def get_toilet():
-    if authenticate():
-        return render_template("add-toilet.html")
-    else:
-        return redirect("/login")
+@app.route('/api/get_map_embed', methods=['POST'])
+def api_get_map_embed():
+    data = request.get_json()
+    lat = data.get('lat', 0)
+    lon = data.get('lon', 0)
+    embed_html = f'''
+        <iframe
+            width="600"
+            height="450"
+            style="border:0"
+            loading="lazy"
+            allowfullscreen
+            src="https://www.google.com/maps/embed/v1/place?key={API_KEY}&q={lat},{lon}&zoom=15">
+        </iframe>
+    '''
+    return jsonify({'embed_html': embed_html})
 
 
 initDB()
+print("bathrooms:", getBathrooms())
 app.run(debug=True)
