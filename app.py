@@ -2,6 +2,7 @@ import sqlite3
 import requests
 import secrets
 import re
+import nh3
 from flask import Flask, render_template, request, redirect, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -26,6 +27,12 @@ def clean_sessions():
     conn, cursor = openDB()
     cursor.execute("DELETE FROM sessions WHERE created_at <= DATETIME('now', '-1 hour')")
     closeDB(conn)
+
+
+def sanitize_text(value, max_length=255):
+    if not value:
+        return value
+    return nh3.clean(value.strip())[:max_length]
 
 
 def IDfromSession():
@@ -85,6 +92,17 @@ def delete_session(token):
     closeDB(conn)
 
 
+def verify_recaptcha(token):
+    url = "https://www.google.com/recaptcha/api/siteverify"
+    payload = {
+        "secret": "6Lc74mksAAAAADpDeQndK344kWqk3pURzX4SM_Dq",
+        "response": token
+    }
+    r = requests.post(url, data=payload)
+    result = r.json()
+    return result.get("success", False)
+
+
 def authenticate():
     token = request.cookies.get("session_token")
     return validate_session(token)
@@ -120,8 +138,7 @@ def initDB():
 
 
 def get_map_url(lat, lon, zoom=15, size="600x400"):
-    map_url = f"https://maps.googleapis.com/maps/api/staticmap?center={lat},{lon}&zoom={zoom}&size={size}&markers=color:red%7C{lat},{lon}&key={API_KEY}"
-    return map_url
+    return f"https://maps.googleapis.com/maps/api/staticmap?center={lat},{lon}&zoom={zoom}&size={size}&markers=color:red%7C{lat},{lon}&key={API_KEY}"
 
 
 def getBathrooms():
@@ -189,7 +206,7 @@ def signIn():
 @app.route("/add_user", methods=["POST"])
 def addUser():
     special = "!@#$%^&*()-+?+,"
-    username = request.form.get("username")
+    username = sanitize_text(request.form.get("username"), max_length=32)  # sanitized
     password = request.form.get("password")  # never sanitize passwords
 
     if not username or not password:
@@ -233,6 +250,17 @@ def logout():
     return response
 
 
+@app.route('/endorse')
+def endorse():
+    selected = request.args.get("toilet_id", "")
+    if not selected or not authenticate():
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    conn, cursor = openDB()
+    cursor.execute("UPDATE bathrooms SET verifications = verifications + 1 WHERE id = ?", (selected,))
+    closeDB(conn)
+    return jsonify({"success": True})
+
+
 @app.route('/api/add_toilet', methods=['POST'])
 def addToilet():
     user_id = authenticate()
@@ -241,7 +269,7 @@ def addToilet():
     try:
         data = request.get_json()
 
-        address = data.get('address')
+        address = sanitize_text(data.get('address'), max_length=255)  # sanitized
         lat = data.get('lat')
         lon = data.get('lon')
         features = data.get('features', [])
@@ -268,6 +296,7 @@ def addToilet():
             "INSERT INTO bathrooms (address, coords, features, cleanliness, user_id) VALUES (?, ?, ?, ?, ?)",
             (address, coords, features_str, cleanliness, user_id)
         )
+        toiletID = cursor.lastrowid
         closeDB(conn)
         return jsonify({"success": True})
     except Exception as e:
@@ -288,8 +317,35 @@ def map_image():
 def index():
     if authenticate():
         session["username"] = usernameFromSession()
-    toilets = getBathrooms()
-    return render_template("index.html", bathrooms=toilets, getUsername=getUsername)
+
+    search = sanitize_text(request.args.get("search", ""), max_length=100)  # sanitized
+    sort = request.args.get("sort", "id")
+    features = [f for f in request.args.getlist("features") if f in {"Accessible", "Baby Changing", "Free", "Soap", "Hand Dryer"}]  # whitelisted
+
+    valid_sorts = {"id", "cleanliness", "verifications"}
+    if sort not in valid_sorts:
+        sort = "id"
+
+    conn, cursor = openDB()
+    query = "SELECT * FROM bathrooms WHERE 1=1"
+    params = []
+
+    if search:
+        query += " AND address LIKE ?"
+        params.append(f"%{search}%")
+
+    for feature in features:
+        query += " AND features LIKE ?"
+        params.append(f"%{feature}%")
+
+    query += f" ORDER BY {sort} DESC"
+
+    cursor.execute(query, params)
+    toilets = cursor.fetchall()
+    closeDB(conn)
+
+    return render_template("index.html", bathrooms=toilets, search=search, sort=sort,
+                           selected_features=features, getUsername=getUsername)
 
 
 @app.route('/api/get_map_embed', methods=['POST'])

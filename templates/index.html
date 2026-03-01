@@ -10,6 +10,33 @@
   </a>
 </div>
 
+<form method="GET" action="/" class="mb-4">
+  <div class="row g-2">
+    <div class="col-md-4">
+      <input type="text" name="search" class="form-control" placeholder="Search by address..." value="{{ search }}">
+    </div>
+    <div class="col-md-3">
+      <select name="sort" class="form-select">
+        <option value="id" {% if sort == 'id' %}selected{% endif %}>Newest</option>
+        <option value="cleanliness" {% if sort == 'cleanliness' %}selected{% endif %}>Cleanliness</option>
+        <option value="verifications" {% if sort == 'verifications' %}selected{% endif %}>Most Endorsed</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      {% for feature in ["Accessible", "Baby Changing", "Free", "Soap", "Hand Dryer"] %}
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="features" value="{{ feature }}"
+          {% if feature in selected_features %}checked{% endif %}>
+        <label class="form-check-label">{{ feature }}</label>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="col-md-1">
+      <button type="submit" class="btn btn-primary w-100">Filter</button>
+    </div>
+  </div>
+</form>
+
 <div id="content">
   <h2 class="mb-4"><i class="bi bi-list"></i> Available Restrooms</h2>
   {% if bathrooms %}
