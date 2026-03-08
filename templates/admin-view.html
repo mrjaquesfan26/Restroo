@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+{% block body %}
+<h1>ADMINISTRATION VIEW</h1>
+<div class="row g-4">
+  {% for toilet in toilets %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100 shadow-sm">
+      <a href="{% if toilet[4] %}https://www.google.com/maps/search/?api=1&query={{ toilet[4]|urlencode }}{% else %}https://www.google.com/maps/@{{ toilet[1].replace(' ', '') }},15z{% endif %}" target="_blank">
+        <img src="/api/map_image?coords={{ toilet[1] }}" class="card-img-top" alt="Map" style="height: 200px; object-fit: cover;">
+      </a>
+      <div class="card-body">
+        <h5 class="card-title">
+          {% if toilet[4] %}
+            {{ toilet[4].split(",")[0] }}
+          {% else %}
+            Restroom #{{ toilet[0] }}
+          {% endif %}
+          <form action="{{ url_for('delete_toilet') }}" method="POST" style="display:inline;">
+            <input type="hidden" name="id" value="{{ toilet[0] }}">
+            <button type="submit" style="background:none; border:none; padding:0; cursor:pointer;">
+              <img src="{{ url_for('static', filename='images/delete.png') }}" width=10>
+            </button>
+          </form>
+        </h5>
+        <p class="mb-2">
+          {% if toilet[6] %}
+            {{ getUsername(toilet[6]) }}
+          {% endif %}
+        </p>
+        <p class="text-muted mb-2">
+          <i class="bi bi-geo-alt"></i>
+          {% if toilet[4] %}
+            {{ toilet[4] }}
+          {% else %}
+            {{ toilet[1] }}
+          {% endif %}
+        </p>
+        <div class="mb-2">
+          <strong>Cleanliness:</strong>
+          {% for i in range(toilet[3]) %}
+            <i class="bi bi-star-fill" style="color: gold;"></i>
+          {% endfor %}
+          {% for i in range(5 - toilet[3]) %}
+            <i class="bi bi-star" style="color: gold;"></i>
+          {% endfor %}
+        </div>
+        {% if toilet[2] %}
+        <div class="mb-2">
+          <strong>Features:</strong><br>
+          {% for feature in toilet[2].split(',') %}
+            {% if feature %}
+              <span class="badge bg-info me-1 mb-1">{{ feature }}</span>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div>
+          <span class="badge" style="background-color: var(--secondary-colour);">
+            <i class="bi bi-hand-thumbs-up"></i> {{ toilet[5] }} Endorsements
+          </span>
+        </div>
+      </div>
+      <div class="card-footer bg-transparent">
+        <a href="{% if toilet[4] %}https://www.google.com/maps/search/?api=1&query={{ toilet[4]|urlencode }}{% else %}https://www.google.com/maps/@{{ toilet[1].replace(' ', '') }},15z{% endif %}" class="btn btn-sm btn-outline-primary w-100" target="_blank">
+          <i class="bi bi-map"></i> View on Map
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

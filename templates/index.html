@@ -1,5 +1,7 @@
 {% extends "layout.html" %}
+
 {% block body %}
+<!-- Header -->
 <div class="text-center mb-4" style="background-color: var(--tertiary-colour); padding: 2rem; border-radius: 0.5rem;">
   <h1 class="display-4 fw-bold" style="color: var(--primary-colour);">
     <i class="bi bi-geo-alt-fill"></i> Restroo
@@ -8,13 +10,21 @@
   <a href="/get-toilet" class="btn btn-lg mt-3" style="background-color: var(--secondary-colour); color: white;">
     <i class="bi bi-plus-circle"></i> Add a Restroom
   </a>
+  {% if is_admin %}
+  <a href="/administration" class="btn btn-lg mt-3 ms-2" style="background-color: var(--primary-colour); color: white;">
+    <i class="bi bi-shield-lock"></i> Administration
+  </a>
+  {% endif %}
 </div>
 
 <form method="GET" action="/" class="mb-4">
   <div class="row g-2">
+    <!-- Search -->
     <div class="col-md-4">
       <input type="text" name="search" class="form-control" placeholder="Search by address..." value="{{ search }}">
     </div>
+
+    <!-- Sort -->
     <div class="col-md-3">
       <select name="sort" class="form-select">
         <option value="id" {% if sort == 'id' %}selected{% endif %}>Newest</option>
@@ -22,6 +32,8 @@
         <option value="verifications" {% if sort == 'verifications' %}selected{% endif %}>Most Endorsed</option>
       </select>
     </div>
+
+    <!-- Feature filters -->
     <div class="col-md-4">
       {% for feature in ["Accessible", "Baby Changing", "Free", "Soap", "Hand Dryer"] %}
       <div class="form-check form-check-inline">
@@ -31,23 +43,29 @@
       </div>
       {% endfor %}
     </div>
+
     <div class="col-md-1">
       <button type="submit" class="btn btn-primary w-100">Filter</button>
     </div>
   </div>
 </form>
 
+<!-- Restrooms List -->
 <div id="content">
   <h2 class="mb-4"><i class="bi bi-list"></i> Available Restrooms</h2>
+
   {% if bathrooms %}
     <div class="row g-4">
       {% for bathroom in bathrooms %}
       <div class="col-md-6 col-lg-4">
         <div class="card h-100 shadow-sm">
+          <!-- Map Image -->
           <a href="{% if bathroom[4] %}https://www.google.com/maps/search/?api=1&query={{ bathroom[4]|urlencode }}{% else %}https://www.google.com/maps/@{{ bathroom[1].replace(' ', '') }},15z{% endif %}" target="_blank">
             <img src="/api/map_image?coords={{ bathroom[1] }}" class="card-img-top" alt="Map" style="height: 200px; object-fit: cover;">
           </a>
+
           <div class="card-body">
+            <!-- Title -->
             <h5 class="card-title">
               {% if bathroom[4] %}
                 {{ bathroom[4].split(",")[0] }}
@@ -55,11 +73,15 @@
                 Restroom #{{ bathroom[0] }}
               {% endif %}
             </h5>
+
+            <!-- Uploader -->
             <p class="mb-2">
               {% if bathroom[6] %}
                 <i class="bi bi-person"></i> {{ getUsername(bathroom[6]) }}
               {% endif %}
             </p>
+
+            <!-- Address/Coords -->
             <p class="text-muted mb-2">
               <i class="bi bi-geo-alt"></i>
               {% if bathroom[4] %}
@@ -68,6 +90,8 @@
                 {{ bathroom[1] }}
               {% endif %}
             </p>
+
+            <!-- Cleanliness Rating -->
             <div class="mb-2">
               <strong>Cleanliness:</strong>
               {% for i in range(bathroom[3]) %}
@@ -77,6 +101,8 @@
                 <i class="bi bi-star" style="color: gold;"></i>
               {% endfor %}
             </div>
+
+            <!-- Features -->
             {% if bathroom[2] %}
             <div class="mb-2">
               <strong>Features:</strong><br>
@@ -87,16 +113,25 @@
               {% endfor %}
             </div>
             {% endif %}
+
+            <!-- Endorsements -->
             <div>
               <span class="badge" style="background-color: var(--secondary-colour);">
-                <i class="bi bi-hand-thumbs-up"></i> {{ bathroom[5] }} Endorsements
+                <i class="bi bi-hand-thumbs-up"></i> <span class="endorsement-count">{{ bathroom[5] }}</span> Endorsements
               </span>
             </div>
           </div>
-          <div class="card-footer bg-transparent">
+
+          <div class="card-footer bg-transparent d-flex gap-2">
             <a href="{% if bathroom[4] %}https://www.google.com/maps/search/?api=1&query={{ bathroom[4]|urlencode }}{% else %}https://www.google.com/maps/@{{ bathroom[1].replace(' ', '') }},15z{% endif %}" class="btn btn-sm btn-outline-primary w-100" target="_blank">
               <i class="bi bi-map"></i> View on Map
             </a>
+            {% if session %}
+            <button class="btn btn-sm w-100 endorse-btn {% if bathroom[0] in endorsed %}btn-success{% else %}btn-outline-success{% endif %}" data-id="{{ bathroom[0] }}">
+              <i class="bi bi-hand-thumbs-up{% if bathroom[0] in endorsed %}-fill{% endif %}"></i>
+              {% if bathroom[0] in endorsed %}Endorsed{% else %}Endorse{% endif %}
+            </button>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -108,4 +143,29 @@
     </div>
   {% endif %}
 </div>
+
+<script>
+document.querySelectorAll('.endorse-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const res = await fetch(`/endorse?toilet_id=${id}`);
+        const data = await res.json();
+        if (data.success) {
+            const badge = btn.closest('.card').querySelector('.endorsement-count');
+            if (data.action === "added") {
+                btn.classList.replace('btn-outline-success', 'btn-success');
+                btn.innerHTML = '<i class="bi bi-hand-thumbs-up-fill"></i> Endorsed';
+                badge.textContent = parseInt(badge.textContent) + 1;
+            } else {
+                btn.classList.replace('btn-success', 'btn-outline-success');
+                btn.innerHTML = '<i class="bi bi-hand-thumbs-up"></i> Endorse';
+                badge.textContent = parseInt(badge.textContent) - 1;
+            }
+        } else {
+            alert(data.error);
+        }
+    });
+});
+</script>
+
 {% endblock %}
